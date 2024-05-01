@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>School Pickup Planner</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        #fileInput, button {
+            margin: 10px 0;
+        }
+
+        .layout-container {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        #arrangementTableContainer {
+            flex: 1 1 70%;
+            overflow-x: auto;
+        }
+
+        #blocksContainer {
+            flex: 1 1 30%;
+            height: 500px;
+            overflow-y: auto;
+            padding: 10px;
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        .draggable {
+            cursor: pointer;
+            background-color: #90EE90;
+            padding: 5px;
+            margin: 5px;
+            border-radius: 3px;
+        }
+
+        #arrangementTable {
+            border-collapse: collapse;
+            width: 100%;
+            table-layout: fixed;
+        }
+
+        thead, tbody {
+            display: block;
+        }
+
+        thead th, tbody td {
+            text-align: center;
+            border: 1px solid #ddd;
+            padding: 8px;
+            font-size: 11px;
+        }
+
+        /* Fixed widths */
+        .time-col { width: 100px; }
+        .driver-col { width: 200px; }
+
+        thead th {
+            position: sticky;
+            top: 0;
+            background-color: #f9f9f9;
+        }
+
+        tbody {
+            height: 400px;
+            overflow-y: auto;
+            background-color: #ffffff;
+        }
+
+        tbody tr:nth-child(odd):not(.highlighted-row, .incorrect-drop) {
+            background-color: #f2f2f2;
+        }
+
+        tbody tr.highlighted-row {
+            background-color: #ffff99 !important; /* Ensures override */
+        }
+
+        tbody tr.incorrect-drop {
+            background-color: #ffcccc !important; /* Light red color for incorrect placement */
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+    <h1>School Pickup File Upload</h1>
+    <input type="file" id="fileInput" />
+    <button onclick="uploadFile()">Upload</button>
+
+    <div class="layout-container">
+        <div id="arrangementTableContainer">
+            <table id="arrangementTable">
+                <thead>
+                    <tr>
+                        <th class="time-col">Time</th>
+                        <th class="driver-col">🚺 Mrs. Wang 🚺 Van C </th>
+                        <th class="driver-col">🚹 Mr. Li 🚹 Van G </th>
+                        <th class="driver-col">🚹 Mr. Zhan 🚹 Van L </th>
+                        <th class="driver-col">🚺 Mrs. Wan 🚺 Van B </th>
+                        <th class="driver-col">🚹 Mr. Michael 🚹 Van G </th>
+                        <th class="driver-col">🚹 Mr. Tevita 🚹 Van Z </th>
+                        <th class="driver-col">🚹 Mr. Yu Wang 🚹 Van F </th>
+                        <th class="driver-col">🚺 Mrs. Zhou 🚺 Van A </th>
+                        <th class="driver-col">🚺 Mrs. Ann 🚺 Van E </th>
+                        <th class="driver-col">🚺 Mrs. Sophia 🚺 Van H </th>
+                        <th class="driver-col">🚺 Mrs. Cici 🚺 OC </th>
+                        <th class="driver-col">🚹 Mr. Diego 🚹 Van D </th>
+                        <!-- Add more headers for additional drivers as needed -->
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Times and slots will be populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+        <div id="blocksContainer">
+            <!-- Blocks will be populated here -->
+        </div>
+    </div>
+
+    <script>
+        function populateTimeSlots(startTime, endTime) {
+            const tableBody = document.getElementById('arrangementTable').getElementsByTagName('tbody')[0];
+            let currentTime = new Date(`2024-01-01T${startTime}:00`);
+
+            while (currentTime <= new Date(`2024-01-01T${endTime}:00`)) {
+                let row = tableBody.insertRow();
+                let timeCell = row.insertCell();
+                timeCell.className = 'time-col';  // Apply the width class
+                timeCell.innerHTML = currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+
+                for (let i = 1; i <= 12; i++) {  // Assuming 12 drivers for simplicity
+                    let cell = row.insertCell();
+                    cell.className = 'driver-col';  // Apply the width class
+                    cell.innerHTML = "";
+                }
+
+                currentTime.setMinutes(currentTime.getMinutes() + 5); // Increment by 5 minutes
+            }
+        }
+
+        function uploadFile() {
+            const input = document.getElementById('fileInput');
+            if (!input.files[0]) {
+                alert('Please select a file first!');
+                return;
+            }
+
+            const data = new FormData();
+            data.append('file', input.files[0]);
+
+            axios.post('/upload', data, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            })
+            .then(function (response) {
+                console.log('Success:', response.data);
+                displayBlocks(response.data);
+                makeBlocksDraggable();  // Ensure this is called after blocks are displayed
+            })
+            .catch(function (error) {
+                console.error('Error:', error);
+            });
+        }
+
+        function displayBlocks(data) {
+            const container = document.getElementById('blocksContainer');
+            container.innerHTML = ''; // Clear previous blocks
+            data.forEach(block => {
+                const div = document.createElement('div');
+                let formattedTime = block.Time.substr(0, 5);
+                div.textContent = `${formattedTime} | ${block.school} | ${block.count}`;
+                div.className = 'draggable';
+                div.id = `block-${block.Time}-${block.school}`;
+                div.setAttribute('draggable', 'true');  // Ensure draggable attribute is set
+                div.dataset.time = formattedTime; // Store time in dataset for easy access
+                div.onclick = function() { highlightTimeSlots(this.dataset.time); }; // Add click handler
+                container.appendChild(div);
+            });
+            makeBlocksDraggable();
+        }
+
+        function highlightTimeSlots(time) {
+            // Clear previous highlights
+            document.querySelectorAll('.highlighted-row').forEach(row => {
+                row.classList.remove('highlighted-row');
+            });
+
+            // Highlight all rows with the same time
+            document.querySelectorAll('#arrangementTable td:first-child').forEach(cell => {
+                if (cell.textContent === time) {
+                    cell.parentNode.classList.add('highlighted-row'); // Highlight the whole row
+                }
+            });
+        }
+
+        function makeBlocksDraggable() {
+            const blocks = document.querySelectorAll('#blocksContainer .draggable');
+            blocks.forEach(block => {
+                block.addEventListener('dragstart', (event) => {
+                    // Clear all incorrect-drop indications when a new drag starts
+                    document.querySelectorAll('.incorrect-drop').forEach(row => {
+                        row.classList.remove('incorrect-drop');
+                    });
+                    // Clear all previous highlights
+                    document.querySelectorAll('.highlighted-row').forEach(row => {
+                        row.classList.remove('highlighted-row');
+                    });
+                    event.dataTransfer.setData('text/plain', block.id);
+                    highlightTimeSlots(block.dataset.time); // Highlight rows on drag start as well
+                });
+            });
+
+            enableDropping();
+        }
+
+        function enableDropping() {
+            const cells = document.querySelectorAll('#arrangementTable td');
+            cells.forEach(cell => {
+                cell.addEventListener('dragover', (event) => {
+                    event.preventDefault(); // Necessary to allow dropping
+                });
+                cell.addEventListener('drop', (event) => {
+                    event.preventDefault();
+                    const blockId = event.dataTransfer.getData('text/plain');
+                    const block = document.getElementById(blockId);
+                    if (block) {
+                        const droppedTime = block.dataset.time;
+                        const rowTime = cell.parentNode.querySelector('.time-col').textContent;
+                        if (droppedTime === rowTime) {
+                            cell.appendChild(block);
+                            // Optionally remove highlighting when the block is correctly dropped
+                            document.querySelectorAll('.highlighted-row').forEach(row => {
+                                row.classList.remove('highlighted-row');
+                            });
+                        } else {
+                            // Highlight the row in red if the drop was incorrect
+                            cell.parentNode.classList.add('incorrect-drop');
+                        }
+                    }
+                });
+            });
+        }
+
+        window.onload = function() {
+            populateTimeSlots("11:30", "16:00");  // Adjust start and end times as necessary
+        };
+    </script>
+</body>
+</html>
